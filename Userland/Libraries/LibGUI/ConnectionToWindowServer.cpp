@@ -84,6 +84,14 @@ void ConnectionToWindowServer::update_system_fonts(ByteString const& default_fon
     });
 }
 
+void ConnectionToWindowServer::font_configuration_changed()
+{
+    // Font configuration has changed, notify all windows to refresh their rendering
+    Window::for_each_window({}, [](auto& window) {
+        Core::EventLoop::current().post_event(window, make<FontsChangeEvent>());
+    });
+}
+
 void ConnectionToWindowServer::update_system_effects(Vector<bool> const& effects)
 {
     Desktop::the().set_system_effects(effects);

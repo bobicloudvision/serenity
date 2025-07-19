@@ -15,6 +15,14 @@ FontConfiguration& FontConfiguration::the()
     return s_the;
 }
 
+void FontConfiguration::set_default_settings(FontRenderingSettings const& settings)
+{
+    m_default_settings = settings;
+    
+    // Update the subpixel renderer with the new settings
+    SubpixelFontRenderer::the().set_default_settings(m_default_settings);
+}
+
 void FontConfiguration::enable_subpixel_rendering(SubpixelOrder order)
 {
     m_default_settings.subpixel_order = order;
@@ -38,5 +46,7 @@ SubpixelOrder FontConfiguration::detect_subpixel_order() const
     // to determine the actual subpixel layout
     return SubpixelOrder::RGB;
 }
+
+
 
 } 

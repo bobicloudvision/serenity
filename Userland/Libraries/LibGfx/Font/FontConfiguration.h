@@ -15,7 +15,7 @@ public:
     static FontConfiguration& the();
 
     FontRenderingSettings const& default_settings() const { return m_default_settings; }
-    void set_default_settings(FontRenderingSettings const& settings) { m_default_settings = settings; }
+    void set_default_settings(FontRenderingSettings const& settings);
 
     // Convenience methods for common configurations
     void enable_subpixel_rendering(SubpixelOrder order = SubpixelOrder::RGB);
@@ -34,6 +34,8 @@ public:
 
     // Auto-detect the best subpixel order for the current display
     SubpixelOrder detect_subpixel_order() const;
+    
+    // Configuration will be managed by WindowServer through WindowServer.ini
 
 private:
     FontConfiguration() {

@@ -161,6 +161,8 @@ private:
     virtual Messages::WindowServer::GetCursorHighlightColorResponse get_cursor_highlight_color() override;
     virtual Messages::WindowServer::GetCursorThemeResponse get_cursor_theme() override;
     virtual Messages::WindowServer::SetSystemFontsResponse set_system_fonts(ByteString const&, ByteString const&, ByteString const&) override;
+    virtual Messages::WindowServer::SetFontRenderingSettingsResponse set_font_rendering_settings(u32, bool, bool, f32 const&, u32) override;
+    virtual Messages::WindowServer::ReloadFontConfigurationResponse reload_font_configuration() override;
     virtual void set_system_effects(Vector<bool> const&, u8, u8) override;
     virtual void set_window_base_size_and_size_increment(i32, Gfx::IntSize, Gfx::IntSize) override;
     virtual void set_window_resize_aspect_ratio(i32, Optional<Gfx::IntSize> const&) override;

@@ -13,6 +13,7 @@
 #include <LibCore/DirIterator.h>
 #include <LibCore/System.h>
 #include <LibFileSystem/FileSystem.h>
+#include <LibGfx/Font/FontConfiguration.h>
 #include <LibGfx/Palette.h>
 #include <LibGfx/SystemTheme.h>
 #include <LibMain/Main.h>
@@ -62,6 +63,27 @@ ErrorOr<int> serenity_main(Main::Arguments)
     Gfx::FontDatabase::set_default_font_query(default_font_query);
     Gfx::FontDatabase::set_fixed_width_font_query(fixed_width_font_query);
     Gfx::FontDatabase::set_window_title_font_query(window_title_font_query);
+
+    // Load font rendering configuration from WindowServer.ini
+    auto& font_config = Gfx::FontConfiguration::the();
+    Gfx::FontRenderingSettings settings;
+    
+    // Load quality setting
+    auto quality_str = WindowServer::g_config->read_entry("FontRendering", "Quality", "2"); // Default to Best
+    settings.quality = static_cast<Gfx::FontRenderingSettings::Quality>(quality_str.to_number<int>().value_or(2));
+    
+    // Load boolean settings
+    settings.use_hinting = WindowServer::g_config->read_bool_entry("FontRendering", "UseHinting", true);
+    settings.use_gamma_correction = WindowServer::g_config->read_bool_entry("FontRendering", "UseGammaCorrection", true);
+    
+    // Load numeric settings
+    auto gamma_str = WindowServer::g_config->read_entry("FontRendering", "GammaValue", "2.2");
+    settings.gamma_value = gamma_str.to_number<float>().value_or(2.2f);
+    
+    auto subpixel_str = WindowServer::g_config->read_entry("FontRendering", "SubpixelOrder", "1"); // Default to RGB
+    settings.subpixel_order = static_cast<Gfx::SubpixelOrder>(subpixel_str.to_number<int>().value_or(1));
+    
+    font_config.set_default_settings(settings);
 
     {
         // FIXME: Map switched tty from screens.

@@ -54,6 +54,7 @@ private:
     virtual void drag_cancelled() override;
     virtual void update_system_theme(Core::AnonymousBuffer const&) override;
     virtual void update_system_fonts(ByteString const&, ByteString const&, ByteString const&) override;
+    virtual void font_configuration_changed() override;
     virtual void update_system_effects(Vector<bool> const&) override;
     virtual void window_state_changed(i32, bool, bool, bool) override;
     virtual void display_link_notification() override;

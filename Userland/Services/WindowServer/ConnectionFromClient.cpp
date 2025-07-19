@@ -7,6 +7,7 @@
 #include <AK/Badge.h>
 #include <LibCore/MimeData.h>
 #include <LibGfx/Bitmap.h>
+#include <LibGfx/Font/FontConfiguration.h>
 #include <LibGfx/StandardCursor.h>
 #include <LibGfx/SystemTheme.h>
 #include <WindowServer/AppletManager.h>
@@ -1000,6 +1001,64 @@ Messages::WindowServer::SetSystemFontsResponse ConnectionFromClient::set_system_
     g_config->write_entry("Fonts", "WindowTitle", window_title_font_query);
 
     return !g_config->sync().is_error();
+}
+
+Messages::WindowServer::SetFontRenderingSettingsResponse ConnectionFromClient::set_font_rendering_settings(u32 quality, bool use_hinting, bool use_gamma_correction, f32 const& gamma_value, u32 subpixel_order)
+{
+    // Save font rendering settings to WindowServer.ini
+    g_config->write_entry("FontRendering", "Quality", ByteString::number(quality));
+    g_config->write_bool_entry("FontRendering", "UseHinting", use_hinting);
+    g_config->write_bool_entry("FontRendering", "UseGammaCorrection", use_gamma_correction);
+    g_config->write_entry("FontRendering", "GammaValue", ByteString::formatted("{:.2f}", gamma_value));
+    g_config->write_entry("FontRendering", "SubpixelOrder", ByteString::number(subpixel_order));
+
+    // Apply the settings immediately
+    auto& font_config = Gfx::FontConfiguration::the();
+    Gfx::FontRenderingSettings settings;
+    settings.quality = static_cast<Gfx::FontRenderingSettings::Quality>(quality);
+    settings.use_hinting = use_hinting;
+    settings.use_gamma_correction = use_gamma_correction;
+    settings.gamma_value = gamma_value;
+    settings.subpixel_order = static_cast<Gfx::SubpixelOrder>(subpixel_order);
+    font_config.set_default_settings(settings);
+
+    // Notify all clients about the font configuration change
+    ConnectionFromClient::for_each_client([&](auto& client) {
+        client.async_font_configuration_changed();
+    });
+
+    return !g_config->sync().is_error();
+}
+
+Messages::WindowServer::ReloadFontConfigurationResponse ConnectionFromClient::reload_font_configuration()
+{
+    // Reload font configuration from WindowServer.ini
+    auto& font_config = Gfx::FontConfiguration::the();
+    Gfx::FontRenderingSettings settings;
+    
+    // Load quality setting
+    auto quality_str = g_config->read_entry("FontRendering", "Quality", "2"); // Default to Best
+    settings.quality = static_cast<Gfx::FontRenderingSettings::Quality>(quality_str.to_number<int>().value_or(2));
+    
+    // Load boolean settings
+    settings.use_hinting = g_config->read_bool_entry("FontRendering", "UseHinting", true);
+    settings.use_gamma_correction = g_config->read_bool_entry("FontRendering", "UseGammaCorrection", true);
+    
+    // Load numeric settings
+    auto gamma_str = g_config->read_entry("FontRendering", "GammaValue", "2.2");
+    settings.gamma_value = gamma_str.to_number<float>().value_or(2.2f);
+    
+    auto subpixel_str = g_config->read_entry("FontRendering", "SubpixelOrder", "1"); // Default to RGB
+    settings.subpixel_order = static_cast<Gfx::SubpixelOrder>(subpixel_str.to_number<int>().value_or(1));
+    
+    font_config.set_default_settings(settings);
+
+    // Notify all clients about the font configuration change
+    ConnectionFromClient::for_each_client([&](auto& client) {
+        client.async_font_configuration_changed();
+    });
+
+    return true;
 }
 
 void ConnectionFromClient::set_system_effects(Vector<bool> const& effects, u8 geometry, u8 tile_window)
