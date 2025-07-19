@@ -8,13 +8,13 @@
 
 #include "FontSettingsWidget.h"
 #include <Applications/DisplaySettings/FontSettingsGML.h>
+#include <LibCore/ConfigFile.h>
 #include <LibGUI/Button.h>
 #include <LibGUI/CheckBox.h>
 #include <LibGUI/ComboBox.h>
 #include <LibGUI/ConnectionToWindowServer.h>
 #include <LibGUI/FontPicker.h>
 #include <LibGUI/ItemListModel.h>
-#include <LibGfx/Font/FontConfiguration.h>
 #include <LibGfx/Font/FontDatabase.h>
 
 namespace DisplaySettings {
@@ -79,30 +79,34 @@ ErrorOr<void> FontSettingsWidget::setup_interface()
 
 ErrorOr<void> FontSettingsWidget::setup_font_quality_controls()
 {
-    // Get current font configuration
-    auto const& config = Gfx::FontConfiguration::the();
-    auto const& settings = config.default_settings();
+    // Read current font rendering settings directly from WindowServer.ini (like other DisplaySettings widgets)
+    auto ws_config = TRY(Core::ConfigFile::open("/etc/WindowServer.ini"));
+    
+    auto quality = static_cast<int>(ws_config->read_entry("FontRendering", "Quality", "2").to_number<int>().value_or(2));
+    auto use_hinting = ws_config->read_bool_entry("FontRendering", "UseHinting", true);
+    auto use_gamma_correction = ws_config->read_bool_entry("FontRendering", "UseGammaCorrection", true);
+    auto subpixel_order = static_cast<int>(ws_config->read_entry("FontRendering", "SubpixelOrder", "1").to_number<int>().value_or(1));
 
     // Set up quality combo box
     m_quality_combo = *find_descendant_of_type_named<GUI::ComboBox>("quality_combo");
     m_quality_options = { "Fast", "Good", "Best" };
     auto quality_model = GUI::ItemListModel<ByteString>::create(m_quality_options);
     m_quality_combo->set_model(quality_model);
-    m_quality_combo->set_selected_index(static_cast<int>(settings.quality));
+    m_quality_combo->set_selected_index(quality);
     m_quality_combo->on_change = [this](auto, auto&) {
         set_modified(true);
     };
 
     // Set up hinting checkbox
     m_hinting_checkbox = *find_descendant_of_type_named<GUI::CheckBox>("hinting_checkbox");
-    m_hinting_checkbox->set_checked(settings.use_hinting);
+    m_hinting_checkbox->set_checked(use_hinting);
     m_hinting_checkbox->on_checked = [this](auto) {
         set_modified(true);
     };
 
     // Set up gamma correction checkbox
     m_gamma_correction_checkbox = *find_descendant_of_type_named<GUI::CheckBox>("gamma_correction_checkbox");
-    m_gamma_correction_checkbox->set_checked(settings.use_gamma_correction);
+    m_gamma_correction_checkbox->set_checked(use_gamma_correction);
     m_gamma_correction_checkbox->on_checked = [this](auto) {
         set_modified(true);
     };
@@ -112,7 +116,7 @@ ErrorOr<void> FontSettingsWidget::setup_font_quality_controls()
     m_subpixel_options = { "None", "RGB", "BGR", "V-RGB", "V-BGR" };
     auto subpixel_model = GUI::ItemListModel<ByteString>::create(m_subpixel_options);
     m_subpixel_combo->set_model(subpixel_model);
-    m_subpixel_combo->set_selected_index(static_cast<int>(settings.subpixel_order));
+    m_subpixel_combo->set_selected_index(subpixel_order);
     m_subpixel_combo->on_change = [this](auto, auto&) {
         set_modified(true);
     };
@@ -133,32 +137,13 @@ void FontSettingsWidget::apply_settings()
         m_fixed_width_font_label->font().qualified_name().to_byte_string(),
         m_window_title_font_label->font().qualified_name().to_byte_string());
 
-    // Apply font quality settings
-    auto& config = Gfx::FontConfiguration::the();
-    Gfx::FontRenderingSettings new_settings;
-    
-    // Set quality based on combo selection
-    auto quality_index = m_quality_combo->selected_index();
-    new_settings.quality = static_cast<Gfx::FontRenderingSettings::Quality>(quality_index);
-    
-    // Set other options
-    new_settings.use_hinting = m_hinting_checkbox->is_checked();
-    new_settings.use_gamma_correction = m_gamma_correction_checkbox->is_checked();
-    new_settings.gamma_value = 2.2f; // Standard gamma value
-    
-    // Set subpixel order
-    auto subpixel_index = m_subpixel_combo->selected_index();
-    new_settings.subpixel_order = static_cast<Gfx::SubpixelOrder>(subpixel_index);
-    
-    config.set_default_settings(new_settings);
-    
-    // Save settings via WindowServer IPC to WindowServer.ini
+    // Save font quality settings via WindowServer IPC (automatically applies settings and notifies all clients)
     auto save_success = GUI::ConnectionToWindowServer::the().set_font_rendering_settings(
-        static_cast<u32>(new_settings.quality),
-        new_settings.use_hinting,
-        new_settings.use_gamma_correction,
-        new_settings.gamma_value,
-        static_cast<u32>(new_settings.subpixel_order)
+        static_cast<u32>(m_quality_combo->selected_index()),
+        m_hinting_checkbox->is_checked(),
+        m_gamma_correction_checkbox->is_checked(),
+        2.2f, // Standard gamma value
+        static_cast<u32>(m_subpixel_combo->selected_index())
     );
     
     if (!save_success) {

@@ -1030,36 +1030,9 @@ Messages::WindowServer::SetFontRenderingSettingsResponse ConnectionFromClient::s
     return !g_config->sync().is_error();
 }
 
-Messages::WindowServer::ReloadFontConfigurationResponse ConnectionFromClient::reload_font_configuration()
-{
-    // Reload font configuration from WindowServer.ini
-    auto& font_config = Gfx::FontConfiguration::the();
-    Gfx::FontRenderingSettings settings;
-    
-    // Load quality setting
-    auto quality_str = g_config->read_entry("FontRendering", "Quality", "2"); // Default to Best
-    settings.quality = static_cast<Gfx::FontRenderingSettings::Quality>(quality_str.to_number<int>().value_or(2));
-    
-    // Load boolean settings
-    settings.use_hinting = g_config->read_bool_entry("FontRendering", "UseHinting", true);
-    settings.use_gamma_correction = g_config->read_bool_entry("FontRendering", "UseGammaCorrection", true);
-    
-    // Load numeric settings
-    auto gamma_str = g_config->read_entry("FontRendering", "GammaValue", "2.2");
-    settings.gamma_value = gamma_str.to_number<float>().value_or(2.2f);
-    
-    auto subpixel_str = g_config->read_entry("FontRendering", "SubpixelOrder", "1"); // Default to RGB
-    settings.subpixel_order = static_cast<Gfx::SubpixelOrder>(subpixel_str.to_number<int>().value_or(1));
-    
-    font_config.set_default_settings(settings);
 
-    // Notify all clients about the font configuration change
-    ConnectionFromClient::for_each_client([&](auto& client) {
-        client.async_font_configuration_changed();
-    });
 
-    return true;
-}
+
 
 void ConnectionFromClient::set_system_effects(Vector<bool> const& effects, u8 geometry, u8 tile_window)
 {
