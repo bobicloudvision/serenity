@@ -37,12 +37,12 @@ public:
 
 private:
     FontConfiguration() {
-        // Set reasonable defaults
+        // Set high-quality defaults
         m_default_settings.subpixel_order = SubpixelOrder::RGB; // Most common
         m_default_settings.use_hinting = true;
         m_default_settings.use_gamma_correction = true;
         m_default_settings.gamma_value = 2.2f;
-        m_default_settings.quality = FontRenderingSettings::Quality::Good;
+        m_default_settings.quality = FontRenderingSettings::Quality::Best; // High quality by default
     }
 
     FontRenderingSettings m_default_settings;

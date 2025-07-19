@@ -14,6 +14,7 @@
 #include <LibCore/MappedFile.h>
 #include <LibCore/Resource.h>
 #include <LibGfx/AntiAliasingPainter.h>
+#include <LibGfx/Font/FontConfiguration.h>
 #include <LibGfx/Font/OpenType/Cmap.h>
 #include <LibGfx/Font/OpenType/Font.h>
 #include <LibGfx/Font/OpenType/Glyf.h>
@@ -619,18 +620,46 @@ RefPtr<Gfx::Bitmap> Font::rasterize_glyph(u32 glyph_id, float x_scale, float y_s
     u32 width = (u32)(ceilf((glyph->xmax() - glyph->xmin()) * x_scale)) + 2;
     u32 height = (u32)(ceilf((ascender_and_descender.ascender - ascender_and_descender.descender) * y_scale)) + 2;
 
-    // Use the enhanced subpixel renderer for better quality
-    auto& subpixel_renderer = Gfx::SubpixelFontRenderer::the();
-    auto enhanced_bitmap = subpixel_renderer.render_glyph_with_subpixel(path, { static_cast<int>(width), static_cast<int>(height) });
-    if (enhanced_bitmap)
-        return enhanced_bitmap;
+    // Get current font configuration for quality settings
+    auto const& config = Gfx::FontConfiguration::the();
+    auto const& settings = config.default_settings();
 
-    // Fall back to standard rendering if subpixel rendering fails
-    auto bitmap = Gfx::Bitmap::create(Gfx::BitmapFormat::BGRA8888, { width, height }).release_value_but_fixme_should_propagate_errors();
-    Gfx::Painter painter { bitmap };
-    Gfx::AntiAliasingPainter aa_painter(painter);
-    aa_painter.fill_path<Gfx::Sample32xAA>(path, Gfx::Color::White);
-    return bitmap;
+    // Use different rendering approaches based on quality setting
+    switch (settings.quality) {
+    case Gfx::FontRenderingSettings::Quality::Best: {
+        // Use the enhanced subpixel renderer for highest quality
+        auto& subpixel_renderer = Gfx::SubpixelFontRenderer::the();
+        auto enhanced_bitmap = subpixel_renderer.render_glyph_with_subpixel(path, { static_cast<int>(width), static_cast<int>(height) });
+        if (enhanced_bitmap)
+            return enhanced_bitmap;
+        
+        // Fall back to high-quality anti-aliasing
+        auto bitmap = Gfx::Bitmap::create(Gfx::BitmapFormat::BGRA8888, { width, height }).release_value_but_fixme_should_propagate_errors();
+        Gfx::Painter painter { bitmap };
+        Gfx::AntiAliasingPainter aa_painter(painter);
+        aa_painter.fill_path<Gfx::Sample32xAA>(path, Gfx::Color::White);
+        return bitmap;
+    }
+    case Gfx::FontRenderingSettings::Quality::Good: {
+        // Use standard high-quality anti-aliasing
+        auto bitmap = Gfx::Bitmap::create(Gfx::BitmapFormat::BGRA8888, { width, height }).release_value_but_fixme_should_propagate_errors();
+        Gfx::Painter painter { bitmap };
+        Gfx::AntiAliasingPainter aa_painter(painter);
+        aa_painter.fill_path<Gfx::Sample16xAA>(path, Gfx::Color::White);
+        return bitmap;
+    }
+    case Gfx::FontRenderingSettings::Quality::Fast: {
+        // Use fast anti-aliasing for performance
+        auto bitmap = Gfx::Bitmap::create(Gfx::BitmapFormat::BGRA8888, { width, height }).release_value_but_fixme_should_propagate_errors();
+        Gfx::Painter painter { bitmap };
+        Gfx::AntiAliasingPainter aa_painter(painter);
+        aa_painter.fill_path<Gfx::Sample8xAA>(path, Gfx::Color::White);
+        return bitmap;
+    }
+    }
+    
+    // This should never be reached due to switch covering all enum values
+    VERIFY_NOT_REACHED();
 }
 
 u32 Font::glyph_count() const
