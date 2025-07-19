@@ -11,6 +11,7 @@
 #include <LibGfx/Font/FontDatabase.h>
 #include <LibGfx/Palette.h>
 #include <LibMain/Main.h>
+#include <AK/FlyString.h>
 
 class FontContentWidget final : public GUI::Widget {
     C_OBJECT(FontContentWidget);
@@ -22,7 +23,7 @@ private:
     FontContentWidget()
     {
         m_sample_text = "ABCDEFGHIJKLMNOPRSTUVWXYZ abcdefghijklmnoprstuvwxyz 1234567890"sv;
-        m_font_sizes = { 16, 18, 20, 24, 28, 32, 36 };
+        m_font_sizes = { 16, 28, 32, 36 };
         calculate_total_height();
     }
 
@@ -69,6 +70,7 @@ private:
 
     void draw_font_section(GUI::Painter& painter, int& y, int x_offset, Gfx::Font const& base_font, StringView title)
     {
+        (void)base_font; // Unused parameter - we get fonts directly now
         auto& title_font = Gfx::FontDatabase::default_fixed_width_font().bold_variant();
         
         // Draw section title with background
@@ -79,7 +81,17 @@ private:
 
         // Draw sample text in different sizes
         for (auto size : m_font_sizes) {
-            auto sized_font = base_font.with_size(size);
+            // Use TrueType font instead of bitmap font to see OpenType rendering differences
+            auto base_font = Gfx::FontDatabase::the().get_by_name(String::formatted("Liberation Mono {} 400 0", size).release_value_but_fixme_should_propagate_errors());
+            if (!base_font) {
+                // Fallback to SerenitySans if Liberation Mono isn't available
+                base_font = Gfx::FontDatabase::the().get_by_name(String::formatted("SerenitySans {} 400 0", size).release_value_but_fixme_should_propagate_errors());
+            }
+            if (!base_font) {
+                // Final fallback to default fixed width font (bitmap)
+                auto& default_font = Gfx::FontDatabase::default_fixed_width_font();
+                base_font = default_font.with_size(size);
+            }
             
             auto size_text = String::formatted("{}px: ", size).release_value_but_fixme_should_propagate_errors();
             
@@ -89,7 +101,8 @@ private:
             
             // Draw sample text
             auto text_rect = Gfx::IntRect(x_offset + 70, y, width() - x_offset - 90, size + 5);
-            painter.draw_text(text_rect, m_sample_text, sized_font, Gfx::TextAlignment::CenterLeft);
+            dbgln("Drawing text at size {} with current config using font: {}", size, base_font->human_readable_name());
+            painter.draw_text(text_rect, m_sample_text, *base_font, Gfx::TextAlignment::CenterLeft);
             
             y += size + 10;
         }
@@ -107,26 +120,44 @@ private:
         y += 30;
 
         // Configure font settings for this section
+        dbgln("=== Configuring {} ===", title);
         config.set_quality(quality);
         
         if (quality == Gfx::FontRenderingSettings::Quality::Best) {
+            dbgln("Setting Best quality: RGB subpixel + hinting + gamma correction");
             config.enable_subpixel_rendering(Gfx::SubpixelOrder::RGB);
             config.enable_hinting();
             config.enable_gamma_correction(2.2f);
         } else if (quality == Gfx::FontRenderingSettings::Quality::Good) {
+            dbgln("Setting Good quality: RGB subpixel + hinting + no gamma");
             config.enable_subpixel_rendering(Gfx::SubpixelOrder::RGB);
             config.enable_hinting();
             config.disable_gamma_correction();
         } else {
+            dbgln("Setting Fast quality: no subpixel + no hinting + no gamma");
             config.disable_subpixel_rendering();
             config.disable_hinting();
             config.disable_gamma_correction();
         }
 
+        // Verify settings were applied
+        auto const& settings = config.default_settings();
+        dbgln("Applied settings: Quality={}, Subpixel={}, Hinting={}, Gamma={}", 
+              (int)settings.quality, (int)settings.subpixel_order, 
+              settings.use_hinting, settings.use_gamma_correction);
+
         // Draw sample text in different sizes
         for (auto size : m_font_sizes) {
-            auto& base_font = Gfx::FontDatabase::default_fixed_width_font();
-            auto sized_font = base_font.with_size(size);
+            // Use TrueType font instead of bitmap font to see OpenType rendering differences
+            auto sized_font = Gfx::FontDatabase::the().get_by_name(String::formatted("Liberation Mono {} 400 0", size).release_value_but_fixme_should_propagate_errors());
+            if (!sized_font) {
+                // Fallback to SerenitySans if Liberation Mono isn't available
+                sized_font = Gfx::FontDatabase::the().get_by_name(String::formatted("SerenitySans {} 400 0", size).release_value_but_fixme_should_propagate_errors());
+            }
+            if (!sized_font) {
+                // Final fallback to default fixed width font (bitmap)
+                sized_font = Gfx::FontDatabase::default_fixed_width_font().with_size(size);
+            }
             
             auto size_text = String::formatted("{}px: ", size).release_value_but_fixme_should_propagate_errors();
             
@@ -136,10 +167,12 @@ private:
             
             // Draw sample text
             auto text_rect = Gfx::IntRect(x_offset + 70, y, width() - x_offset - 90, size + 5);
-            painter.draw_text(text_rect, m_sample_text, sized_font, Gfx::TextAlignment::CenterLeft);
+            dbgln("Drawing text at size {} with current config using font: {}", size, sized_font->human_readable_name());
+            painter.draw_text(text_rect, m_sample_text, *sized_font, Gfx::TextAlignment::CenterLeft);
             
             y += size + 10;
         }
+        dbgln("=== Finished {} section ===", title);
     }
 
     StringView m_sample_text;
