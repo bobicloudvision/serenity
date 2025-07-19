@@ -650,11 +650,11 @@ RefPtr<Gfx::Bitmap> Font::rasterize_glyph(u32 glyph_id, float x_scale, float y_s
     }
     case Gfx::FontRenderingSettings::Quality::Fast: {
         // Use fast anti-aliasing for performance
-        auto bitmap = Gfx::Bitmap::create(Gfx::BitmapFormat::BGRA8888, { width, height }).release_value_but_fixme_should_propagate_errors();
-        Gfx::Painter painter { bitmap };
-        Gfx::AntiAliasingPainter aa_painter(painter);
+    auto bitmap = Gfx::Bitmap::create(Gfx::BitmapFormat::BGRA8888, { width, height }).release_value_but_fixme_should_propagate_errors();
+    Gfx::Painter painter { bitmap };
+    Gfx::AntiAliasingPainter aa_painter(painter);
         aa_painter.fill_path<Gfx::Sample8xAA>(path, Gfx::Color::White);
-        return bitmap;
+    return bitmap;
     }
     }
     
