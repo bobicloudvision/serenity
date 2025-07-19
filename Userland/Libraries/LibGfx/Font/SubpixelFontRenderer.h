@@ -32,6 +32,9 @@ private:
     RefPtr<Bitmap> render_subpixel_horizontal(Path const& path, IntSize size, SubpixelOrder order, FontRenderingSettings const& settings);
     RefPtr<Bitmap> render_subpixel_vertical(Path const& path, IntSize size, SubpixelOrder order, FontRenderingSettings const& settings);
     
+    void apply_lcd_filtering(Bitmap const& source, Bitmap& target, SubpixelOrder order);
+    void apply_vertical_lcd_filtering(Bitmap const& source, Bitmap& target, SubpixelOrder order);
+    
     Color apply_gamma_correction(Color color, float gamma) const;
     Color blend_with_gamma(Color foreground, Color background, float gamma) const;
 

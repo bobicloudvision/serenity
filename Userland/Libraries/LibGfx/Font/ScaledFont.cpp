@@ -1,13 +1,17 @@
 /*
  * Copyright (c) 2022, the SerenityOS developers.
+ * Copyright (c) 2023, Andreas Kling <kling@serenityos.org>
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <AK/Math.h>
 #include <AK/Utf32View.h>
 #include <AK/Utf8View.h>
 #include <LibGfx/Font/Emoji.h>
 #include <LibGfx/Font/ScaledFont.h>
+#include <LibGfx/Painter.h>
+#include <typeinfo>
 
 namespace Gfx {
 
@@ -73,18 +77,14 @@ ALWAYS_INLINE float ScaledFont::unicode_view_width(T const& view) const
 
 RefPtr<Gfx::Bitmap> ScaledFont::rasterize_glyph(u32 glyph_id, GlyphSubpixelOffset subpixel_offset) const
 {
-    static bool debug_logged = false;
-    if (!debug_logged) {
-        dbgln("ScaledFont::rasterize_glyph called for font: {}, calling underlying font rasterization", human_readable_name());
-        debug_logged = true;
-    }
+    auto index = GlyphIndexWithSubpixelOffset { glyph_id, subpixel_offset };
 
-    GlyphIndexWithSubpixelOffset index { glyph_id, subpixel_offset };
     auto glyph_iterator = m_cached_glyph_bitmaps.find(index);
     if (glyph_iterator != m_cached_glyph_bitmaps.end())
         return glyph_iterator->value;
 
     auto glyph_bitmap = m_font->rasterize_glyph(glyph_id, m_x_scale, m_y_scale, subpixel_offset);
+    
     m_cached_glyph_bitmaps.set(index, glyph_bitmap);
     return glyph_bitmap;
 }
