@@ -323,6 +323,11 @@ public:
     bool is_destroyed() const { return m_destroyed; }
     void destroy();
 
+    bool wants_blur() const { return m_wants_blur; }
+    void set_wants_blur(bool wants_blur) { m_wants_blur = wants_blur; }
+    int blur_intensity() const { return m_blur_intensity; }
+    void set_blur_intensity(int intensity) { m_blur_intensity = max(0, min(50, intensity)); }
+
     bool is_default_positioned() const { return m_default_positioned; }
     void set_default_positioned(bool p) { m_default_positioned = p; }
 
@@ -469,6 +474,10 @@ private:
     bool m_should_show_window_content { true };
     WindowStack* m_window_stack { nullptr };
     RefPtr<Animation> m_animation;
+    
+    // Blur effect properties
+    bool m_wants_blur { false };
+    int m_blur_intensity { 1 };
 
     Optional<pid_t> m_process_id {};
 

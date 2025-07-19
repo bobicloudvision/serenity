@@ -76,6 +76,11 @@ public:
     void set_has_alpha_channel(bool);
     bool has_alpha_channel() const { return m_has_alpha_channel; }
 
+    void set_wants_blur(bool);
+    bool wants_blur() const { return m_wants_blur; }
+    void set_blur_intensity(int intensity);
+    int blur_intensity() const { return m_blur_intensity; }
+
     void set_alpha_hit_threshold(float);
     float alpha_hit_threshold() const { return m_alpha_hit_threshold; }
 
@@ -311,6 +316,8 @@ private:
     AK::Variant<Gfx::StandardCursor, NonnullRefPtr<Gfx::Bitmap const>> m_cursor { Gfx::StandardCursor::None };
     AK::Variant<Gfx::StandardCursor, NonnullRefPtr<Gfx::Bitmap const>> m_effective_cursor { Gfx::StandardCursor::None };
     bool m_has_alpha_channel { false };
+    bool m_wants_blur { false };
+    int m_blur_intensity { 1 };
     bool m_double_buffering_enabled { true };
     bool m_resizable { true };
     bool m_obey_widget_min_size { true };

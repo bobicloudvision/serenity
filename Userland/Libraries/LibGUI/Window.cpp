@@ -980,6 +980,29 @@ void Window::set_has_alpha_channel(bool value)
     update();
 }
 
+void Window::set_wants_blur(bool wants_blur)
+{
+    if (m_wants_blur == wants_blur)
+        return;
+    m_wants_blur = wants_blur;
+    if (!is_visible())
+        return;
+
+    ConnectionToWindowServer::the().async_set_window_wants_blur(m_window_id, wants_blur);
+}
+
+void Window::set_blur_intensity(int intensity)
+{
+    intensity = max(0, min(50, intensity)); // Clamp to valid range (0-50)
+    if (m_blur_intensity == intensity)
+        return;
+    m_blur_intensity = intensity;
+    if (!is_visible())
+        return;
+
+    ConnectionToWindowServer::the().async_set_window_blur_intensity(m_window_id, intensity);
+}
+
 void Window::set_double_buffering_enabled(bool value)
 {
     VERIFY(!is_visible());

@@ -860,6 +860,26 @@ void ConnectionFromClient::set_window_has_alpha_channel(i32 window_id, bool has_
     it->value->set_has_alpha_channel(has_alpha_channel);
 }
 
+void ConnectionFromClient::set_window_wants_blur(i32 window_id, bool wants_blur)
+{
+    auto it = m_windows.find(window_id);
+    if (it == m_windows.end()) {
+        did_misbehave("SetWindowWantsBlur: Bad window ID");
+        return;
+    }
+    it->value->set_wants_blur(wants_blur);
+}
+
+void ConnectionFromClient::set_window_blur_intensity(i32 window_id, i32 intensity)
+{
+    auto it = m_windows.find(window_id);
+    if (it == m_windows.end()) {
+        did_misbehave("SetWindowBlurIntensity: Bad window ID");
+        return;
+    }
+    it->value->set_blur_intensity(intensity);
+}
+
 void ConnectionFromClient::set_window_alpha_hit_threshold(i32 window_id, float threshold)
 {
     auto it = m_windows.find(window_id);

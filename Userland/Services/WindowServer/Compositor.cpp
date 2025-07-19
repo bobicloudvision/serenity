@@ -27,6 +27,118 @@
 
 namespace WindowServer {
 
+// Global blur settings
+static int s_default_blur_intensity = 1; // Default blur intensity for apps that request blur
+
+// Optimized blur function with fixed downsampling for performance
+static void apply_simple_blur(Gfx::Bitmap& bitmap, Gfx::IntRect const& rect, int blur_radius = 1)
+{
+    if (blur_radius <= 0)
+        return;
+    
+    auto blur_rect = rect.intersected(bitmap.rect());
+    if (blur_rect.is_empty())
+        return;
+    
+    // Clamp blur radius to reasonable range (0-50)
+    blur_radius = min(blur_radius, 50);
+    
+    // Use aggressive downsampling for performance on high blur values
+    int downsample_factor = 1;
+    if (blur_radius > 40) {
+        downsample_factor = 4; // 4x downsampling for extreme blur
+    } else if (blur_radius > 25) {
+        downsample_factor = 3; // 3x downsampling for very high blur
+    } else if (blur_radius > 10) {
+        downsample_factor = 2; // 2x downsampling for high blur
+    }
+    
+    int downsampled_width = (blur_rect.width() + downsample_factor - 1) / downsample_factor;
+    int downsampled_height = (blur_rect.height() + downsample_factor - 1) / downsample_factor;
+    
+    // Create working bitmap if downsampling
+    RefPtr<Gfx::Bitmap> working_bitmap;
+    if (downsample_factor > 1) {
+        auto bitmap_or_error = Gfx::Bitmap::create(Gfx::BitmapFormat::BGRA8888, 
+            { downsampled_width, downsampled_height });
+        if (bitmap_or_error.is_error())
+            return;
+        working_bitmap = bitmap_or_error.release_value_but_fixme_should_propagate_errors();
+        
+        // Downsample the original image
+        for (int y = 0; y < downsampled_height; y++) {
+            for (int x = 0; x < downsampled_width; x++) {
+                int src_x = blur_rect.left() + x * downsample_factor;
+                int src_y = blur_rect.top() + y * downsample_factor;
+                if (src_x < bitmap.width() && src_y < bitmap.height()) {
+                    working_bitmap->set_pixel(x, y, bitmap.get_pixel(src_x, src_y));
+                }
+            }
+        }
+    } else {
+        working_bitmap = &bitmap;
+    }
+    
+    // Calculate blur parameters
+    auto scaled_blur_radius = max(2, blur_radius / downsample_factor);
+    auto work_rect = downsample_factor > 1 ? 
+        Gfx::IntRect(0, 0, downsampled_width, downsampled_height) : blur_rect;
+    
+    // Apply blur to working bitmap
+    for (int y = work_rect.top(); y < work_rect.bottom(); y++) {
+        for (int x = work_rect.left(); x < work_rect.right(); x++) {
+            int total_r = 0, total_g = 0, total_b = 0;
+            int count = 0;
+            
+            // Sample surrounding pixels
+            for (int dy = -scaled_blur_radius; dy <= scaled_blur_radius; dy++) {
+                for (int dx = -scaled_blur_radius; dx <= scaled_blur_radius; dx++) {
+                    int sample_x = x + dx;
+                    int sample_y = y + dy;
+                    
+                    if (sample_x >= work_rect.left() && sample_x < work_rect.right() && 
+                        sample_y >= work_rect.top() && sample_y < work_rect.bottom()) {
+                        auto pixel = working_bitmap->get_pixel(sample_x, sample_y);
+                        total_r += pixel.red();
+                        total_g += pixel.green();
+                        total_b += pixel.blue();
+                        count++;
+                    }
+                }
+            }
+            
+            if (count > 0) {
+                auto blurred_color = Gfx::Color(
+                    total_r / count,
+                    total_g / count, 
+                    total_b / count,
+                    255
+                );
+                working_bitmap->set_pixel(x, y, blurred_color);
+            }
+        }
+    }
+    
+    // Upsample back to original size if we downsampled
+    if (downsample_factor > 1) {
+        for (int y = blur_rect.top(); y < blur_rect.bottom(); y++) {
+            for (int x = blur_rect.left(); x < blur_rect.right(); x++) {
+                int src_x = (x - blur_rect.left()) / downsample_factor;
+                int src_y = (y - blur_rect.top()) / downsample_factor;
+                
+                // Ensure we don't go out of bounds
+                src_x = min(src_x, downsampled_width - 1);
+                src_y = min(src_y, downsampled_height - 1);
+                src_x = max(src_x, 0);
+                src_y = max(src_y, 0);
+                
+                auto blurred_pixel = working_bitmap->get_pixel(src_x, src_y);
+                bitmap.set_pixel(x, y, blurred_pixel);
+            }
+        }
+    }
+}
+
 Compositor& Compositor::the()
 {
     static Compositor s_the;
@@ -146,6 +258,11 @@ void Compositor::did_construct_window_manager(Badge<WindowManager>)
 
     m_wallpaper_mode = mode_to_enum(g_config->read_entry("Background", "Mode", "Center"));
     m_custom_background_color = Color::from_string(g_config->read_entry("Background", "Color", ""));
+
+    // Read default blur intensity setting
+    s_default_blur_intensity = g_config->read_num_entry("Effects", "DefaultBlurIntensity", 2);
+    // Clamp blur intensity to valid range (0-50)
+    s_default_blur_intensity = max(0, min(50, s_default_blur_intensity));
 
     invalidate_screen();
     invalidate_occlusions();
@@ -387,6 +504,42 @@ void Compositor::compose()
             if (update_window_rect.is_empty())
                 return;
 
+                        // Apply simple background blur effect
+            auto apply_background_blur = [&](Gfx::IntRect const& blur_rect) {
+                // Check if this window wants blur effect
+                if (!window.wants_blur())
+                    return;
+                
+                // Skip blur for very small areas or when area is too large for high blur
+                if (blur_rect.width() < 50 || blur_rect.height() < 50)
+                    return;
+                
+                // For very high blur on large areas, limit the blur area for performance
+                if (window.blur_intensity() > 25 && (blur_rect.width() * blur_rect.height() > 200000)) {
+                    // Skip blur on very large areas with extreme blur to maintain responsiveness
+                    return;
+                }
+                
+                auto& screen_data = screen.compositor_screen_data();
+                auto source_bitmap = &painter == screen_data.m_back_painter.ptr() ? screen_data.m_back_bitmap : screen_data.m_temp_bitmap;
+                
+                auto temp_bitmap_or_error = Gfx::Bitmap::create(source_bitmap->format(), blur_rect.size(), source_bitmap->scale());
+                if (!temp_bitmap_or_error.is_error()) {
+                    auto temp_bitmap = temp_bitmap_or_error.release_value();
+                    
+                    // Copy the background content to temp bitmap
+                    Gfx::Painter temp_painter(*temp_bitmap);
+                    auto src_rect = blur_rect.translated(-screen.rect().location());
+                    temp_painter.blit({0, 0}, *source_bitmap, src_rect);
+                    
+                    // Apply simple blur effect with window's configured intensity
+                    apply_simple_blur(*temp_bitmap, temp_bitmap->rect(), window.blur_intensity());
+                    
+                    // Blit the blurred background back
+                    painter.blit(blur_rect.location(), *temp_bitmap, temp_bitmap->rect());
+                }
+            };
+
             auto clear_window_rect = [&](Gfx::IntRect const& clear_rect) {
                 painter.fill_rect(clear_rect, wm.palette().window());
             };
@@ -438,11 +591,27 @@ void Compositor::compose()
             if (!dirty_rect_in_backing_coordinates.is_empty()) {
                 auto dst = backing_rect.location().translated(dirty_rect_in_backing_coordinates.location());
 
+                // Apply background blur behind the window content
+                auto window_content_rect = Gfx::IntRect(dst, dirty_rect_in_backing_coordinates.size());
+                apply_background_blur(window_content_rect);
+
                 if (window.client() && window.client()->is_unresponsive()) {
                     painter.blit_filtered(dst, *backing_store, dirty_rect_in_backing_coordinates, [](Color src) {
                         return src.to_grayscale().darkened(0.75f);
                     });
+                } else if (window.wants_blur()) {
+                    // For blur windows, respect the existing alpha channel from the window's opacity setting
+                    if (window.has_alpha_channel()) {
+                        // Window already has transparency - just render normally to preserve it
+                        painter.blit(dst, *backing_store, dirty_rect_in_backing_coordinates);
+                    } else {
+                        // For fully opaque windows with blur, add slight transparency for glass effect
+                        painter.blit_filtered(dst, *backing_store, dirty_rect_in_backing_coordinates, [](Color src) {
+                            return src.with_alpha(min(200, src.alpha()));
+                        });
+                    }
                 } else {
+                    // Normal rendering when blur is disabled
                     painter.blit(dst, *backing_store, dirty_rect_in_backing_coordinates);
                 }
             }
@@ -888,6 +1057,44 @@ void Compositor::screen_resolution_changed()
     overlay_rects_changed();
     update_wallpaper_bitmap();
     compose();
+}
+
+bool Compositor::set_blur_enabled(bool)
+{
+    // This method is now deprecated - blur is controlled per-window
+    // But we keep it for compatibility and to set the default intensity
+    return true;
+}
+
+bool Compositor::is_blur_enabled() const
+{
+    // Check if any window has blur enabled
+    bool any_blur = false;
+    WindowManager::the().for_each_visible_window_from_back_to_front([&](Window& window) {
+        if (window.wants_blur()) {
+            any_blur = true;
+            return IterationDecision::Break;
+        }
+        return IterationDecision::Continue;
+    });
+    return any_blur;
+}
+
+bool Compositor::set_blur_intensity(int intensity)
+{
+    // Update the default blur intensity for new windows
+    intensity = max(0, min(50, intensity));
+    s_default_blur_intensity = intensity;
+    
+    // Save the setting to configuration
+    g_config->write_num_entry("Effects", "DefaultBlurIntensity", intensity);
+    
+    return true;
+}
+
+int Compositor::blur_intensity() const
+{
+    return s_default_blur_intensity;
 }
 
 Gfx::IntRect Compositor::current_cursor_rect() const

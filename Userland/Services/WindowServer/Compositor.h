@@ -110,6 +110,11 @@ public:
     bool set_wallpaper(RefPtr<Gfx::Bitmap const>);
     RefPtr<Gfx::Bitmap const> wallpaper_bitmap() const { return m_wallpaper; }
 
+    bool set_blur_enabled(bool enabled);
+    bool is_blur_enabled() const;
+    bool set_blur_intensity(int intensity);
+    int blur_intensity() const;
+
     void invalidate_cursor(bool = false);
     Gfx::IntRect current_cursor_rect() const;
     Cursor const* current_cursor() const { return m_current_cursor; }
