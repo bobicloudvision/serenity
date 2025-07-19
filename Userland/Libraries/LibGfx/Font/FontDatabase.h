@@ -42,6 +42,9 @@ public:
 
     void for_each_typeface(Function<void(Typeface const&)>);
     void for_each_typeface_with_family_name(FlyString const& family_name, Function<void(Typeface const&)>);
+    
+    // Cache management for font rendering quality changes
+    void invalidate_all_glyph_caches();
 
     void load_all_fonts_from_uri(StringView);
 

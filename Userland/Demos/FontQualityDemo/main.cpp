@@ -12,6 +12,7 @@
 #include <LibGfx/Palette.h>
 #include <LibMain/Main.h>
 #include <AK/FlyString.h>
+#include <typeinfo>
 
 class FontContentWidget final : public GUI::Widget {
     C_OBJECT(FontContentWidget);
@@ -102,6 +103,8 @@ private:
             // Draw sample text
             auto text_rect = Gfx::IntRect(x_offset + 70, y, width() - x_offset - 90, size + 5);
             dbgln("Drawing text at size {} with current config using font: {}", size, base_font->human_readable_name());
+            dbgln("Font type: {}", typeid(*base_font).name());
+            
             painter.draw_text(text_rect, m_sample_text, *base_font, Gfx::TextAlignment::CenterLeft);
             
             y += size + 10;
@@ -168,6 +171,8 @@ private:
             // Draw sample text
             auto text_rect = Gfx::IntRect(x_offset + 70, y, width() - x_offset - 90, size + 5);
             dbgln("Drawing text at size {} with current config using font: {}", size, sized_font->human_readable_name());
+            dbgln("Font type: {}", typeid(*sized_font).name());
+            
             painter.draw_text(text_rect, m_sample_text, *sized_font, Gfx::TextAlignment::CenterLeft);
             
             y += size + 10;

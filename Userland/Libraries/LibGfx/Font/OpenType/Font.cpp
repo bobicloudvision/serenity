@@ -624,16 +624,25 @@ RefPtr<Gfx::Bitmap> Font::rasterize_glyph(u32 glyph_id, float x_scale, float y_s
     auto const& config = Gfx::FontConfiguration::the();
     auto const& settings = config.default_settings();
 
+    // DEBUG: Print current settings
+    dbgln("Font rendering: Quality={}, Subpixel={}, Hinting={}, Gamma={}", 
+          (int)settings.quality, (int)settings.subpixel_order, 
+          settings.use_hinting, settings.use_gamma_correction);
+
     // Use different rendering approaches based on quality setting
     switch (settings.quality) {
     case Gfx::FontRenderingSettings::Quality::Best: {
+        dbgln("Using BEST quality rendering with subpixel renderer");
         // Use the enhanced subpixel renderer for highest quality
         auto& subpixel_renderer = Gfx::SubpixelFontRenderer::the();
-        auto enhanced_bitmap = subpixel_renderer.render_glyph_with_subpixel(path, { static_cast<int>(width), static_cast<int>(height) });
-        if (enhanced_bitmap)
+        auto enhanced_bitmap = subpixel_renderer.render_glyph_with_subpixel(path, { static_cast<int>(width), static_cast<int>(height) }, settings);
+        if (enhanced_bitmap) {
+            dbgln("SubpixelFontRenderer succeeded, returning enhanced bitmap");
             return enhanced_bitmap;
+        }
         
         // Fall back to high-quality anti-aliasing
+        dbgln("Subpixel renderer returned null, falling back to Sample32xAA");
         auto bitmap = Gfx::Bitmap::create(Gfx::BitmapFormat::BGRA8888, { width, height }).release_value_but_fixme_should_propagate_errors();
         Gfx::Painter painter { bitmap };
         Gfx::AntiAliasingPainter aa_painter(painter);
@@ -641,6 +650,7 @@ RefPtr<Gfx::Bitmap> Font::rasterize_glyph(u32 glyph_id, float x_scale, float y_s
         return bitmap;
     }
     case Gfx::FontRenderingSettings::Quality::Good: {
+        dbgln("Using GOOD quality rendering with Sample16xAA");
         // Use standard high-quality anti-aliasing
         auto bitmap = Gfx::Bitmap::create(Gfx::BitmapFormat::BGRA8888, { width, height }).release_value_but_fixme_should_propagate_errors();
         Gfx::Painter painter { bitmap };
@@ -649,6 +659,7 @@ RefPtr<Gfx::Bitmap> Font::rasterize_glyph(u32 glyph_id, float x_scale, float y_s
         return bitmap;
     }
     case Gfx::FontRenderingSettings::Quality::Fast: {
+        dbgln("Using FAST quality rendering with Sample8xAA");
         // Use fast anti-aliasing for performance
     auto bitmap = Gfx::Bitmap::create(Gfx::BitmapFormat::BGRA8888, { width, height }).release_value_but_fixme_should_propagate_errors();
     Gfx::Painter painter { bitmap };

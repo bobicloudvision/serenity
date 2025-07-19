@@ -6,6 +6,7 @@
 
 #include <LibGfx/Font/FontConfiguration.h>
 #include <LibGfx/Font/SubpixelFontRenderer.h>
+#include <LibGfx/Font/FontDatabase.h>
 
 namespace Gfx {
 
@@ -21,6 +22,9 @@ void FontConfiguration::set_default_settings(FontRenderingSettings const& settin
     
     // Update the subpixel renderer with the new settings
     SubpixelFontRenderer::the().set_default_settings(m_default_settings);
+    
+    // Invalidate all glyph caches so quality changes take effect immediately
+    FontDatabase::the().invalidate_all_glyph_caches();
 }
 
 void FontConfiguration::enable_subpixel_rendering(SubpixelOrder order)
@@ -29,6 +33,9 @@ void FontConfiguration::enable_subpixel_rendering(SubpixelOrder order)
     
     // Update the subpixel renderer with the new settings
     SubpixelFontRenderer::the().set_default_settings(m_default_settings);
+    
+    // Invalidate all glyph caches so quality changes take effect immediately
+    FontDatabase::the().invalidate_all_glyph_caches();
 }
 
 void FontConfiguration::disable_subpixel_rendering()
@@ -37,6 +44,9 @@ void FontConfiguration::disable_subpixel_rendering()
     
     // Update the subpixel renderer with the new settings
     SubpixelFontRenderer::the().set_default_settings(m_default_settings);
+    
+    // Invalidate all glyph caches so quality changes take effect immediately
+    FontDatabase::the().invalidate_all_glyph_caches();
 }
 
 SubpixelOrder FontConfiguration::detect_subpixel_order() const

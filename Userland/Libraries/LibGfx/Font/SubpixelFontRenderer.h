@@ -28,9 +28,9 @@ public:
 private:
     SubpixelFontRenderer() = default;
 
-    RefPtr<Bitmap> render_grayscale(Path const& path, IntSize size);
-    RefPtr<Bitmap> render_subpixel_horizontal(Path const& path, IntSize size, SubpixelOrder order);
-    RefPtr<Bitmap> render_subpixel_vertical(Path const& path, IntSize size, SubpixelOrder order);
+    RefPtr<Bitmap> render_grayscale(Path const& path, IntSize size, FontRenderingSettings const& settings);
+    RefPtr<Bitmap> render_subpixel_horizontal(Path const& path, IntSize size, SubpixelOrder order, FontRenderingSettings const& settings);
+    RefPtr<Bitmap> render_subpixel_vertical(Path const& path, IntSize size, SubpixelOrder order, FontRenderingSettings const& settings);
     
     Color apply_gamma_correction(Color color, float gamma) const;
     Color blend_with_gamma(Color foreground, Color background, float gamma) const;

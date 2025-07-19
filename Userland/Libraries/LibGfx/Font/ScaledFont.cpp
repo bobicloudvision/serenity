@@ -73,6 +73,12 @@ ALWAYS_INLINE float ScaledFont::unicode_view_width(T const& view) const
 
 RefPtr<Gfx::Bitmap> ScaledFont::rasterize_glyph(u32 glyph_id, GlyphSubpixelOffset subpixel_offset) const
 {
+    static bool debug_logged = false;
+    if (!debug_logged) {
+        dbgln("ScaledFont::rasterize_glyph called for font: {}, calling underlying font rasterization", human_readable_name());
+        debug_logged = true;
+    }
+
     GlyphIndexWithSubpixelOffset index { glyph_id, subpixel_offset };
     auto glyph_iterator = m_cached_glyph_bitmaps.find(index);
     if (glyph_iterator != m_cached_glyph_bitmaps.end())
@@ -106,6 +112,12 @@ Gfx::Glyph ScaledFont::glyph(u32 code_point) const
 
 Gfx::Glyph ScaledFont::glyph(u32 code_point, GlyphSubpixelOffset subpixel_offset) const
 {
+    static bool debug_logged = false;
+    if (!debug_logged) {
+        dbgln("ScaledFont::glyph called for font: {}", human_readable_name());
+        debug_logged = true;
+    }
+    
     auto id = glyph_id_for_code_point(code_point);
     auto bitmap = rasterize_glyph(id, subpixel_offset);
     auto metrics = glyph_metrics(id);

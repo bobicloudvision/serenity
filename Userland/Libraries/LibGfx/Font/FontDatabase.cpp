@@ -13,6 +13,7 @@
 #include <LibFileSystem/FileSystem.h>
 #include <LibGfx/Font/Font.h>
 #include <LibGfx/Font/FontDatabase.h>
+#include <LibGfx/Font/ScaledFont.h>
 #include <LibGfx/Font/OpenType/Font.h>
 #include <LibGfx/Font/Typeface.h>
 #include <LibGfx/Font/WOFF/Font.h>
@@ -143,6 +144,18 @@ void FontDatabase::load_all_fonts_from_uri(StringView uri)
         }
         return IterationDecision::Continue;
     });
+}
+
+void FontDatabase::invalidate_all_glyph_caches()
+{
+    for_each_font([](Gfx::Font const& font) {
+        // Check if this is a ScaledFont and invalidate its cache
+        if (auto const* scaled_font = dynamic_cast<Gfx::ScaledFont const*>(&font)) {
+            scaled_font->invalidate_glyph_cache();
+        }
+    });
+    
+    dbgln("FontDatabase: Invalidated all glyph caches due to rendering settings change");
 }
 
 FontDatabase::FontDatabase()

@@ -22,24 +22,31 @@ RefPtr<Bitmap> SubpixelFontRenderer::render_glyph_with_subpixel(
     IntSize glyph_size,
     FontRenderingSettings const& settings)
 {
+    dbgln("SubpixelFontRenderer::render_glyph_with_subpixel called with size={}x{}, subpixel_order={}, quality={}", 
+          glyph_size.width(), glyph_size.height(), (int)settings.subpixel_order, (int)settings.quality);
+    
     if (glyph_size.width() == 0 || glyph_size.height() == 0)
         return {};
 
     switch (settings.subpixel_order) {
     case SubpixelOrder::None:
-        return render_grayscale(glyph_path, glyph_size);
+        dbgln("Using grayscale rendering with quality level {}", (int)settings.quality);
+        return render_grayscale(glyph_path, glyph_size, settings);
     case SubpixelOrder::RGB:
     case SubpixelOrder::BGR:
-        return render_subpixel_horizontal(glyph_path, glyph_size, settings.subpixel_order);
+        dbgln("Using horizontal subpixel rendering (order={}) with quality level {}", (int)settings.subpixel_order, (int)settings.quality);
+        return render_subpixel_horizontal(glyph_path, glyph_size, settings.subpixel_order, settings);
     case SubpixelOrder::VRGB:
     case SubpixelOrder::VBGR:
-        return render_subpixel_vertical(glyph_path, glyph_size, settings.subpixel_order);
+        dbgln("Using vertical subpixel rendering (order={}) with quality level {}", (int)settings.subpixel_order, (int)settings.quality);
+        return render_subpixel_vertical(glyph_path, glyph_size, settings.subpixel_order, settings);
     }
     
-    return render_grayscale(glyph_path, glyph_size);
+    dbgln("Falling back to grayscale rendering");
+    return render_grayscale(glyph_path, glyph_size, settings);
 }
 
-RefPtr<Bitmap> SubpixelFontRenderer::render_grayscale(Path const& path, IntSize size)
+RefPtr<Bitmap> SubpixelFontRenderer::render_grayscale(Path const& path, IntSize size, FontRenderingSettings const& settings)
 {
     auto bitmap = Bitmap::create(BitmapFormat::BGRA8888, size);
     if (bitmap.is_error())
@@ -49,16 +56,31 @@ RefPtr<Bitmap> SubpixelFontRenderer::render_grayscale(Path const& path, IntSize 
     Painter painter(*result_bitmap);
     AntiAliasingPainter aa_painter(painter);
     
-    // Use high-quality sampling for better results
-    aa_painter.fill_path<Sample32xAA>(path, Color::White);
+    // Use different quality levels based on settings
+    switch (settings.quality) {
+    case FontRenderingSettings::Quality::Fast:
+        dbgln("Using Sample8xAA for Fast quality");
+        aa_painter.fill_path<Sample8xAA>(path, Color::White);
+        break;
+    case FontRenderingSettings::Quality::Good:
+        dbgln("Using Sample16xAA for Good quality");
+        aa_painter.fill_path<Sample16xAA>(path, Color::White);
+        break;
+    case FontRenderingSettings::Quality::Best:
+        dbgln("Using Sample32xAA for Best quality");
+        aa_painter.fill_path<Sample32xAA>(path, Color::White);
+        break;
+    }
     
     return result_bitmap;
 }
 
-RefPtr<Bitmap> SubpixelFontRenderer::render_subpixel_horizontal(Path const& path, IntSize size, SubpixelOrder)
+RefPtr<Bitmap> SubpixelFontRenderer::render_subpixel_horizontal(Path const& path, IntSize size, SubpixelOrder order, FontRenderingSettings const& settings)
 {
-    // For now, use standard rendering as the path API is complex
-    // This is a simplified version that still provides some subpixel benefits
+    (void)order; // TODO: Use subpixel order when implementing true subpixel rendering
+    
+    // For now, use standard rendering with quality-based sampling
+    // TODO: Implement true subpixel rendering (3x wider bitmap, RGB sampling)
     auto bitmap = Bitmap::create(BitmapFormat::BGRA8888, size);
     if (bitmap.is_error())
         return {};
@@ -67,16 +89,31 @@ RefPtr<Bitmap> SubpixelFontRenderer::render_subpixel_horizontal(Path const& path
     Painter painter(*result_bitmap);
     AntiAliasingPainter aa_painter(painter);
     
-    // Use high-quality sampling for better results
-    aa_painter.fill_path<Sample32xAA>(path, Color::White);
+    // Use different quality levels - subpixel rendering should look better than grayscale
+    switch (settings.quality) {
+    case FontRenderingSettings::Quality::Fast:
+        dbgln("Subpixel horizontal: Using Sample16xAA for Fast quality (better than grayscale)");
+        aa_painter.fill_path<Sample16xAA>(path, Color::White);
+        break;
+    case FontRenderingSettings::Quality::Good:
+        dbgln("Subpixel horizontal: Using Sample32xAA for Good quality");
+        aa_painter.fill_path<Sample32xAA>(path, Color::White);
+        break;
+    case FontRenderingSettings::Quality::Best:
+        dbgln("Subpixel horizontal: Using Sample32xAA for Best quality");
+        aa_painter.fill_path<Sample32xAA>(path, Color::White);
+        break;
+    }
     
     return result_bitmap;
 }
 
-RefPtr<Bitmap> SubpixelFontRenderer::render_subpixel_vertical(Path const& path, IntSize size, SubpixelOrder)
+RefPtr<Bitmap> SubpixelFontRenderer::render_subpixel_vertical(Path const& path, IntSize size, SubpixelOrder order, FontRenderingSettings const& settings)
 {
-    // For now, use standard rendering as the path API is complex
-    // This is a simplified version that still provides some benefits
+    (void)order; // TODO: Use subpixel order when implementing true subpixel rendering
+    
+    // For now, use standard rendering with quality-based sampling
+    // TODO: Implement true vertical subpixel rendering
     auto bitmap = Bitmap::create(BitmapFormat::BGRA8888, size);
     if (bitmap.is_error())
         return {};
@@ -85,8 +122,21 @@ RefPtr<Bitmap> SubpixelFontRenderer::render_subpixel_vertical(Path const& path, 
     Painter painter(*result_bitmap);
     AntiAliasingPainter aa_painter(painter);
     
-    // Use high-quality sampling for better results
-    aa_painter.fill_path<Sample32xAA>(path, Color::White);
+    // Use different quality levels for vertical subpixel
+    switch (settings.quality) {
+    case FontRenderingSettings::Quality::Fast:
+        dbgln("Subpixel vertical: Using Sample16xAA for Fast quality");
+        aa_painter.fill_path<Sample16xAA>(path, Color::White);
+        break;
+    case FontRenderingSettings::Quality::Good:
+        dbgln("Subpixel vertical: Using Sample32xAA for Good quality");
+        aa_painter.fill_path<Sample32xAA>(path, Color::White);
+        break;
+    case FontRenderingSettings::Quality::Best:
+        dbgln("Subpixel vertical: Using Sample32xAA for Best quality");
+        aa_painter.fill_path<Sample32xAA>(path, Color::White);
+        break;
+    }
     
     return result_bitmap;
 }
