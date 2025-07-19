@@ -93,8 +93,9 @@ struct GlyphSubpixelOffset {
     u8 x;
     u8 y;
 
+    // Increased subpixel resolution for better font quality
     // TODO: Allow setting this at runtime via some config?
-    static constexpr int subpixel_divisions() { return 3; }
+    static constexpr int subpixel_divisions() { return 8; }
     FloatPoint to_float_point() const { return FloatPoint(x / float(subpixel_divisions()), y / float(subpixel_divisions())); }
 
     bool operator==(GlyphSubpixelOffset const&) const = default;
@@ -141,6 +142,28 @@ enum FontWidth {
     Expanded = 7,
     ExtraExpanded = 8,
     UltraExpanded = 9
+};
+
+enum class SubpixelOrder {
+    None,      // Grayscale anti-aliasing
+    RGB,       // Red-Green-Blue (most common LCD)
+    BGR,       // Blue-Green-Red  
+    VRGB,      // Vertical RGB
+    VBGR       // Vertical BGR
+};
+
+struct FontRenderingSettings {
+    SubpixelOrder subpixel_order { SubpixelOrder::None };
+    bool use_hinting { true };
+    bool use_gamma_correction { true };
+    float gamma_value { 2.2f };
+    
+    // Quality vs performance trade-off
+    enum class Quality {
+        Fast,      // Basic anti-aliasing
+        Good,      // Standard quality
+        Best       // Highest quality, slower
+    } quality { Quality::Good };
 };
 
 class Font : public RefCounted<Font> {

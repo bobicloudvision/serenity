@@ -19,13 +19,16 @@ set(SOURCES
     Font/BitmapFont.cpp
     Font/Emoji.cpp
     Font/Font.cpp
+    Font/FontConfiguration.cpp
     Font/FontDatabase.cpp
     Font/OpenType/Cmap.cpp
     Font/OpenType/Font.cpp
     Font/OpenType/Glyf.cpp
+    Font/OpenType/Hinting/Interpreter.cpp
     Font/OpenType/Hinting/Opcodes.cpp
     Font/OpenType/Tables.cpp
     Font/ScaledFont.cpp
+    Font/SubpixelFontRenderer.cpp
     Font/Typeface.cpp
     Font/VectorFont.cpp
     Font/WOFF/Font.cpp
